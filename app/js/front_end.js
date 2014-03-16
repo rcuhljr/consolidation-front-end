@@ -301,7 +301,7 @@ var update_turn_counter = function(turn) {
 	status_context.textBaseline = "top";
 	status_context.font = '13pt Arial black';
 	status_context.textAlign = 'top';
-	status_context.fillText('Turn: ' + turn, 0, yOffset);
+	status_context.fillText('Step: ' + turn, 0, yOffset);
 };
 
 var update_player_status_window = function(id, name, bulk, reserves, turn) {
@@ -341,18 +341,44 @@ var next_step = function() {
 		process_attack(the_event);
 	}
 };
+
+var last_step = function(){
+	current_step -= 1;
+	var the_event = game_events[current_step];	
+	update_turn_counter(current_step);
+
+	if (the_event["type"] === "reinforcement") {
+		reverse_reinforcement(the_event);
+	} else {
+		reverse_attack(the_event);
+	}	
+}
 /*
-					"type": "battle",
-					"player": player,
-					"attacker": game_event["attacking_region"],
-					"defender": game_event["defending_region"],
+					"type": "battle"
+					"attacking_region": game_event["attacking_region_id"],
+					"defending_region": game_event["defending_region_id"],
 					"attack_dice": game_event["attack_dice"],
 					"defense_dice": game_event["defense_dice"],
-					"victory": game_event["attack_successful"]
+					"victory": game_event["attack_successful"],
+					"attacker" :game_event["attacker"],
+					"defender" :game_event["defender"]
+
+
+
+{"game_id":2,"ordinal":3,"event_type":"battle",
+	"attacking_region_id":37,
+	"defending_region_id":47,
+	"attacker":{"player_id":4,"name":"bob","bulk":9,"reserves":0,"total_strength":40,"regions":16,"is_my_turn":true},
+	"defender":{"player_id":3,"name":"devui","bulk":12,"reserves":0,"total_strength":44,"regions":14,"is_my_turn":false},
+	"attack_strength":6,
+	"defense_strength":1,
+	"attack_dice":[5,2,4,3,5,1],
+	"defense_dice":[3]
+	,"attack_value":20,"defense_value":3,"attack_successful":true}
 */
 var process_attack = function(attack) {
-	var attacker = attack["attacker"]["id"];
-	var defender = attack["defender"]["id"];
+	var attacker = attack["attacking_region"];
+	var defender = attack["defending_region"];
 	var attack_dice = attack["attack_dice"];
 	var victory = attack["victory"];
 	draw_region(attacker, true);
@@ -367,6 +393,53 @@ var process_attack = function(attack) {
 			process_loss(attacker, defender);
 		}, 1000);
 	}
+};
+
+/*
+					"type": "battle"
+					"attacking_region": game_event["attacking_region_id"],
+					"defending_region": game_event["defending_region_id"],
+					"attack_dice": game_event["attack_dice"],
+					"defense_dice": game_event["defense_dice"],
+					"victory": game_event["attack_successful"],
+					"attacker" :game_event["attacker"],
+					"defender" :game_event["defender"]
+
+
+
+{"game_id":2,"ordinal":3,"event_type":"battle",
+	"attacking_region_id":37,
+	"defending_region_id":47,
+	"attacker":{"player_id":4,"name":"bob","bulk":9,"reserves":0,"total_strength":40,"regions":16,"is_my_turn":true},
+	"defender":{"player_id":3,"name":"devui","bulk":12,"reserves":0,"total_strength":44,"regions":14,"is_my_turn":false},
+	"attack_strength":6,
+	"defense_strength":1,
+	"attack_dice":[5,2,4,3,5,1],
+	"defense_dice":[3]
+	,"attack_value":20,"defense_value":3,"attack_successful":true}
+*/
+
+var reverse_attack = function(attack){
+	var def_reg = attack["defending_region"];
+	var att_reg = attack["attacking_region"];
+	var defender = attack["defender"]["player_id"];
+	var attacker = attack["attacker"]["player_id"];
+
+	armies[att_reg] = attack["attack_dice"].length;
+	armies[def_reg] = attack["defense_dice"].length;
+
+	if(attack["victory"]){
+		var temp = player_regions[attacker];
+		var index = temp.indexOf(def_reg);
+		temp.splice(index,1);
+		player_regions[attacker] = temp;
+
+		player_regions[defender].push(def_reg);
+	}
+
+	draw_region(att_reg,false);
+	draw_region(def_reg,false);
+
 };
 
 var process_victory = function(attacker, defender, attack_dice) {
@@ -414,15 +487,6 @@ var place_reinforcement_helper = function(history) {
 	"history":[4,13,25,19,4,10,1,25,19,13,1,7,28,7,16,16,10,28,22,22],
 	"placements":{"4":2,"13":2,"25":2,"19":2,"10":2,"1":2,"7":2,"28":2,"16":2,"22":2}}
 
-	{"game_id":1,"ordinal":7,"event_type":"battle","attacking_region":
-		{"id":9,"strength":3,"owner_id":3,"original_owner_id":3,"game_id":1},
-	"defending_region":
-		{"id":20,"strength":3,"owner_id":3,"original_owner_id":2,"game_id":1},
-	"attacker":
-		{"id":3,"reserves":6,"user_id":5,"game_id":1},
-	"defender":
-		{"id":2,"reserves":0,"user_id":4,"game_id":1},
-	"attack_strength":3,"defense_strength":1,"attack_dice":[2,6,5],"defense_dice":[1],"attack_value":13,"defense_value":1,"attack_successful":true}
 */
 var game_events;
 var current_step;
@@ -456,18 +520,34 @@ var process_game_history = function(data) {
 			} else {
 				game_events[ordinal - player_count] = {
 					"type": "battle",
-					"player": player,
-					"attacker": game_event["attacking_region"],
-					"defender": game_event["defending_region"],
+					"attacking_region": game_event["attacking_region_id"],
+					"defending_region": game_event["defending_region_id"],
 					"attack_dice": game_event["attack_dice"],
 					"defense_dice": game_event["defense_dice"],
-					"victory": game_event["attack_successful"]
+					"victory": game_event["attack_successful"],
+					"attacker" :game_event["attacker"],
+					"defender" :game_event["defender"]
 				};
 			}
 
 		}
 	}
 };
+
+/*
+{"game_id":2,"ordinal":3,"event_type":"battle",
+	"attacking_region_id":37,
+	"defending_region_id":47,
+	"attacker":{"player_id":4,"name":"bob","bulk":9,"reserves":0,"total_strength":40,"regions":16,"is_my_turn":true},
+	"defender":{"player_id":3,"name":"devui","bulk":12,"reserves":0,"total_strength":44,"regions":14,"is_my_turn":false},
+	"attack_strength":6,
+	"defense_strength":1,
+	"attack_dice":[5,2,4,3,5,1],
+	"defense_dice":[3]
+	,"attack_value":20,"defense_value":3,"attack_successful":true}
+	
+
+*/
 
 
 var process_player_data = function(data) {
@@ -513,8 +593,8 @@ var load_remote_game = function() {
 		announce_region(x, y);
 	});
 
-
-	start_remote_load(2);
+	var gameId = document.getElementById("game_id_input").value;
+	start_remote_load(gameId || 2);
 };
 
 var start_remote_load = function(id) {
