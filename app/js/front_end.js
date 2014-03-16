@@ -19,6 +19,45 @@ var player_regions;
 
 var armies;
 
+var TIMING_EVENTS = {
+	ATTACKER_HIGHLIGHT: 1,
+	DEFENDER_HIGHLIGHT: 2
+};
+
+var get_delay = function(event) {
+	if (document.getElementById("animations-toggle").checked) {
+		switch (event) {
+			case TIMING_EVENTS.ATTACKER_HIGHLIGHT:
+				return 0;
+			case TIMING_EVENTS.DEFENDER_HIGHLIGHT:
+				return 0;
+			case TIMING_EVENTS.REINFORCEMENT_SPACER:
+				return 0;
+			case TIMING_EVENTS.STEP_DELAY:
+				return 0;
+			case TIMING_EVENTS.REINFORCEMENT_HIGHLIGHT:
+				return 0;
+			default:
+				return 0;
+		}
+	} else {
+		switch (event) {
+			case TIMING_EVENTS.ATTACKER_HIGHLIGHT:
+				return 375;
+			case TIMING_EVENTS.DEFENDER_HIGHLIGHT:
+				return 375;
+			case TIMING_EVENTS.REINFORCEMENT_SPACER:
+				return 150;
+			case TIMING_EVENTS.STEP_DELAY:
+				return 200;
+			case TIMING_EVENTS.REINFORCEMENT_HIGHLIGHT:
+				return 200;
+			default:
+				return 0;
+		}
+	}
+};
+
 
 var board_context;
 
@@ -30,16 +69,18 @@ var width = sample_data["width"];
 var unit = scale_x / width / 2;
 var cos_30 = Math.cos(30 / 360 * Math.PI * 2);
 
-var draw_region = function(region, selected) {
+var draw_region = function(region, selected, reinforcement) {
 	var reg_hexes = region_hash[region];
 	var edges = [];
 	var middle_hex = reg_hexes[0];
-
+	var best_middle = 8;
 	for (item in reg_hexes) {
 		var oldsize = edges.length;
 		get_edges(reg_hexes[item][0], reg_hexes[item][1], region, edges);
-		if (oldsize == edges.length) //try and find a hex with no sides drawn
+		if ((edges.length - oldsize) <= best_middle) { //try and find a hex with no sides drawn
+			best_middle = edges.length - oldsize;
 			middle_hex = reg_hexes[item];
+		}
 	}
 
 	build_path(edges);
@@ -59,17 +100,26 @@ var draw_region = function(region, selected) {
 	board_context.fill();
 	board_context.stroke();
 
-	draw_army_label(region, middle_hex);
+	draw_army_label(region, middle_hex, reinforcement);
 
 };
 
-var draw_army_label = function(region, hex) {
+var draw_army_label = function(region, hex, reinforcement) {
 	var point = get_center_of_hex(hex[0], hex[1]);
 	var offset = .6 * unit;
-	board_context.fillStyle = 'white';
+	if (reinforcement) {
+		board_context.fillStyle = 'black';
+	} else {
+		board_context.fillStyle = 'white';
+	}
 	board_context.fillRect(point[0] - offset, point[1] - offset, 14, 12);
 	board_context.font = 'Bold 9pt Arial black';
-	board_context.fillStyle = 'black';
+	if (reinforcement) {
+		board_context.fillStyle = 'white';
+	} else {
+		board_context.fillStyle = 'black';
+
+	}
 	board_context.textAlign = 'center';
 	board_context.fillText(armies[region], point[0], point[1] + 4);
 
@@ -261,7 +311,7 @@ var load_game = function() {
 	clear_board(game_board, board_context);
 	process_hexes();
 	for (var region in region_hash) {
-		draw_region(region, false);
+		draw_region(region, false, false);
 	}
 
 };
@@ -342,8 +392,15 @@ var stop = function() {
 };
 
 var next_step = function() {
+	if (Object.keys(game_events).length < current_step) {
+		if (keep_polling) {
+			get_new_events();
+		}
+		return;
+	}
 	var the_event = game_events[current_step];
 	current_step += 1;
+
 	update_turn_counter(current_step);
 
 	if (the_event["type"] === "reinforcement") {
@@ -354,6 +411,9 @@ var next_step = function() {
 };
 
 var last_step = function() {
+	if (current_step <= 1) {
+		return;
+	}
 	current_step -= 1;
 	var the_event = game_events[current_step];
 	update_turn_counter(current_step);
@@ -392,21 +452,21 @@ var process_attack = function(attack) {
 	var defender = attack["defending_region"];
 	var attack_dice = attack["attack_dice"];
 	var victory = attack["victory"];
-	draw_region(attacker, true);
+	draw_region(attacker, true, false);
 	setTimeout(function() {
 
-		draw_region(defender, true);
+		draw_region(defender, true, false);
 
 		if (victory) {
 			setTimeout(function() {
 				process_victory(attacker, defender, attack_dice);
-			}, 375);
+			}, get_delay(TIMING_EVENTS.DEFENDER_HIGHLIGHT));
 		} else {
 			setTimeout(function() {
 				process_loss(attacker, defender);
-			}, 375);
+			}, get_delay(TIMING_EVENTS.DEFENDER_HIGHLIGHT));
 		}
-	}, 375);
+	}, get_delay(TIMING_EVENTS.ATTACKER_HIGHLIGHT));
 
 };
 
@@ -437,8 +497,8 @@ var process_attack = function(attack) {
 var reverse_attack = function(attack) {
 	var def_reg = attack["defending_region"];
 	var att_reg = attack["attacking_region"];
-	var defender = attack["defender"]["player_id"];
-	var attacker = attack["attacker"]["player_id"];
+	var defender = attack["defender"];
+	var attacker = attack["attacker"];
 
 	armies[att_reg] = attack["attack_dice"].length;
 	armies[def_reg] = attack["defense_dice"].length;
@@ -452,8 +512,8 @@ var reverse_attack = function(attack) {
 		player_regions[defender].push(def_reg);
 	}
 
-	draw_region(att_reg, false);
-	draw_region(def_reg, false);
+	draw_region(att_reg, false, false);
+	draw_region(def_reg, false, false);
 
 };
 
@@ -470,50 +530,60 @@ var process_victory = function(attacker, defender, attack_dice) {
 	player_regions[loser] = temp;
 	player_regions[winner].push(defender);
 
-	draw_region(attacker, false);
-	draw_region(defender, false);
+	draw_region(attacker, false, false);
+	draw_region(defender, false, false);
 	if (playing) {
 		setTimeout(function() {
 			next_step();
-		}, 200);
+		}, get_delay(TIMING_EVENTS.STEP_DELAY));
 	}
 };
 
 var process_loss = function(attacker, defender) {
-	armies[defender] = 1;
-	draw_region(attacker, false);
-	draw_region(defender, false);
+	armies[attacker] = 1;
+	draw_region(attacker, false, false);
+	draw_region(defender, false, false);
 	if (playing) {
 		setTimeout(function() {
 			next_step();
-		}, 200);
+		}, get_delay(TIMING_EVENTS.STEP_DELAY));
+	}
+};
+
+var reverse_reinforcement = function(reinfo) {
+	var placements = reinfo["placements"];
+	for (var reg in placements) {
+		armies[reg] = armies[reg] - parseInt(placements[reg]);
+		draw_region(reg, false, false);
 	}
 };
 
 var process_reinforcement = function(reinfo) {
 	var history = reinfo["history"];
-	if(history[0]){
-		place_reinforcement_helper(history);
-	}else if (playing) {
-		setTimeout(function() {
-			next_step();
-		}, 200);
-	}
-};
-
-var place_reinforcement_helper = function(history) {
-	var reg = history[0];
-	history.splice(0, 1);
-	armies[reg] = armies[reg] + 1;
-	draw_region(reg, false);
 	if (history[0]) {
-		setTimeout(function() {
-			place_reinforcement_helper(history);
-		}, 150);
+		place_reinforcement_helper(history, 0);
 	} else if (playing) {
 		setTimeout(function() {
 			next_step();
-		}, 200);
+		}, get_delay(TIMING_EVENTS.STEP_DELAY));
+	}
+};
+
+var place_reinforcement_helper = function(history, i) {
+	var reg = history[i];
+	armies[reg] = armies[reg] + 1;
+	draw_region(reg, false, true);
+	setTimeout(function() {
+		draw_region(reg, false, false);
+	}, get_delay(TIMING_EVENTS.REINFORCEMENT_HIGHLIGHT));
+	if (history[i + 1]) {
+		setTimeout(function() {
+			place_reinforcement_helper(history, i + 1);
+		}, get_delay(TIMING_EVENTS.REINFORCEMENT_SPACER));
+	} else if (playing) {
+		setTimeout(function() {
+			next_step();
+		}, get_delay(TIMING_EVENTS.STEP_DELAY));
 	}
 }
 
@@ -525,12 +595,27 @@ var place_reinforcement_helper = function(history) {
 */
 var game_events;
 var current_step;
+var player_count;
+var keep_polling;
 
 var process_game_history = function(data) {
 	game_events = {};
 	current_step = 1;
+	keep_polling = true;
 	update_turn_counter(current_step);
-	var player_count = Object.keys(player_to_colors).length;
+	player_count = Object.keys(player_to_colors).length;
+	update_local_history(data);
+
+};
+
+var additional_game_history = function(data) {
+	update_local_history(data);
+	if (playing) {
+		next_step();
+	}
+};
+
+var update_local_history = function(data) {
 	for (var key in data) {
 		var game_event = data[key];
 		var ordinal = game_event["ordinal"];
@@ -541,7 +626,7 @@ var process_game_history = function(data) {
 			var placements = game_event["placements"];
 			for (var region_id in placements) {
 				armies[region_id] = armies[region_id] + placements[region_id];
-				draw_region(region_id, false);
+				draw_region(region_id, false, false);
 			}
 		} else {
 			//log events for usage.
@@ -550,7 +635,8 @@ var process_game_history = function(data) {
 					"type": "reinforcement",
 					"player": player,
 					"pool_initial": game_event["pool_initial"],
-					"history": game_event["history"]
+					"history": game_event["history"],
+					"placements": game_event["placements"]
 				};
 			} else {
 				game_events[ordinal - player_count] = {
@@ -560,14 +646,14 @@ var process_game_history = function(data) {
 					"attack_dice": game_event["attack_dice"],
 					"defense_dice": game_event["defense_dice"],
 					"victory": game_event["attack_successful"],
-					"attacker": game_event["attacker"],
-					"defender": game_event["defender"]
+					"attacker": game_event["attacker_id"],
+					"defender": game_event["defender_id"]
 				};
 			}
 
 		}
 	}
-};
+}
 
 /*
 {"game_id":2,"ordinal":3,"event_type":"battle",
@@ -608,9 +694,22 @@ var process_player_data = function(data) {
 	}
 
 	for (var region in region_hash) {
-		draw_region(region, false);
+		draw_region(region, false, false);
 	}
 };
+
+/*
+{"game_id":16,"name":"Game 16",
+"state":"complete","active_players":1,"number_of_players":5,"action_count":379,"winner":{"id":36,"reserves":0,"seat_number":3,"has_lost":false,"user_id":12,"game_id":16},"players":[{"player_id":36,"name":"Genetic4","bulk":30,"reserves":0,"total_strength":170,"regions":30,"is_my_turn":true}],"regions":[{"region_id":451,"owner_id":36,"strength":8},{"region_id":452,"owner_id":36,"strength":6},{"region_id":453,"owner_id":36,"strength":8},{"region_id":454,"owner_id":36,"strength":1},{"region_id":455,"owner_id":36,"strength":8},{"region_id":456,"owner_id":36,"strength":1},{"region_id":457,"owner_id":36,"strength":8},{"region_id":458,"owner_id":36,"strength":1},{"region_id":459,"owner_id":36,"strength":8},{"region_id":460,"owner_id":36,"strength":2},{"region_id":461,"owner_id":36,"strength":8},{"region_id":462,"owner_id":36,"strength":7},{"region_id":463,"owner_id":36,"strength":8},{"region_id":464,"owner_id":36,"strength":4},{"region_id":465,"owner_id":36,"strength":5},{"region_id":466,"owner_id":36,"strength":4},{"region_id":467,"owner_id":36,"strength":1},{"region_id":468,"owner_id":36,"strength":8},{"region_id":469,"owner_id":36,"strength":8},{"region_id":470,"owner_id":36,"strength":8},{"region_id":471,"owner_id":36,"strength":8},{"region_id":472,"owner_id":36,"strength":8},{"region_id":473,"owner_id":36,"strength":6},{"region_id":474,"owner_id":36,"strength":5},{"region_id":475,"owner_id":36,"strength":6},{"region_id":476,"owner_id":36,"strength":1},{"region_id":477,"owner_id":36,"strength":7},{"region_id":478,"owner_id":36,"strength":8},{"region_id":479,"owner_id":36,"strength":8},{"region_id":480,"owner_id":36,"strength":1}]}*/
+
+var process_game_summary = function(data){
+	if(data[0]["state"] === "complete"){
+		keep_polling = false;
+	}
+};
+
+var board_left;
+var board_top;
 
 var load_remote_game = function() {
 	var game_board = document.getElementById("game-display");
@@ -618,21 +717,29 @@ var load_remote_game = function() {
 	clear_board(game_board, board_context);
 
 
-	elemLeft = game_board.offsetLeft,
-	elemTop = game_board.offsetTop,
+	board_left = game_board.offsetLeft,
+	board_top = game_board.offsetTop,
 
 	// Add event listener for `click` events.
-	game_board.addEventListener('click', function(event) {
-		var x = event.pageX - elemLeft,
-			y = event.pageY - elemTop;
-		announce_region(x, y);
-	});
+	game_board.removeEventListener('click', region_click_handler);
+	game_board.addEventListener('click', region_click_handler);
 
 	var gameId = document.getElementById("game_id_input").value;
 	start_remote_load(gameId || 2);
 };
 
+var region_click_handler = function(event) {
+	var x = event.pageX - board_left,
+		y = event.pageY - board_top;
+	announce_region(x, y);
+};
+
+
+var game_id;
+
 var start_remote_load = function(id) {
+
+	game_id = id;
 
 	var url = "http://192.168.0.123:3000/geography";
 
@@ -745,4 +852,62 @@ var load_player_data = function(id) {
 		error: function() {}
 	});
 
+};
+
+var get_new_events = function() {
+
+	var url = "http://192.168.0.123:3000/events";
+
+	$.ajax({
+		type: 'GET',
+		url: url,
+		data: {
+			game_id: game_id,
+			since: current_step + player_count - 1
+		},
+		contentType: 'text/plain',
+
+		xhrFields: {
+			withCredentials: false
+		},
+
+		headers: {
+
+		},
+
+		success: function(data) {
+			additional_game_history(data);
+			check_for_finished();
+		},
+
+		error: function() {}
+	});
+};
+
+var check_for_finished = function() {
+
+	var url = "http://192.168.0.123:3000/game";
+
+	$.ajax({
+		type: 'GET',
+		url: url,
+		data: {
+			game_id: game_id
+		},
+		contentType: 'text/plain',
+
+		xhrFields: {
+			withCredentials: false
+		},
+
+		headers: {
+
+		},
+
+		success: function(data) {
+			process_game_summary(data);			
+		},
+
+		error: function() {}
+	});
 };
