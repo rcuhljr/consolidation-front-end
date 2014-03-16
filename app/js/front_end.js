@@ -135,6 +135,21 @@ var get_center_of_hex = function(q, r) {
 	return [bx, by];
 };
 
+var announce_region = function(x,y){
+	var closest_reg;
+	var distance = 9999999;
+	for (var value in hexes) {
+		var vals = value.match(hex_re);
+		var reg = hexes[value];		
+		var point = get_center_of_hex(parseInt(vals[1]),parseInt(vals[2]));
+		if((point[0]-x)*(point[0]-x)+(point[1]-y)*(point[1]-y) < distance){
+			distance = (point[0]-x)*(point[0]-x)+(point[1]-y)*(point[1]-y);
+			closest_reg = reg;
+		}		
+	}
+	alert(closest_reg);
+}
+
 var get_edges = function(q, r, reg, edge_col) {
 	var center_point = get_center_of_hex(q, r);
 
@@ -461,6 +476,18 @@ var load_remote_game = function() {
 	var game_board = document.getElementById("game-display");
 	board_context = game_board.getContext("2d");
 	clear_board(game_board, board_context);
+
+	
+    elemLeft = game_board.offsetLeft,
+    elemTop = game_board.offsetTop,
+
+	// Add event listener for `click` events.
+	game_board.addEventListener('click', function(event) {
+    var x = event.pageX - elemLeft,
+        y = event.pageY - elemTop;
+        announce_region(x,y);
+    });
+
 
 	start_remote_load(2);
 };
