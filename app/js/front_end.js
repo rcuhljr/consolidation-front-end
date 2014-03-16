@@ -279,8 +279,8 @@ var process_player_stats = function(data) {
 		var player_info = data[key];
 		var id = player_info["player_id"];
 		var name = player_info["name"];
-		var bulk = player_info["bulk"];
-		var reserves = player_info["reserves"];
+		var bulk = player_info["bulk"] || 0;
+		var reserves = player_info["reserves"] || 0;
 		var turn = player_info["is_my_turn"];
 		update_player_status_window(id, name, bulk, reserves, turn);
 	}
@@ -295,7 +295,7 @@ var update_turn_counter = function(turn) {
 	var yOffset = 340;
 
 
-	status_context.clearRect(0, yOffset, 130, 30);	
+	status_context.clearRect(0, yOffset, 130, 30);
 
 	status_context.fillStyle = "black";
 	status_context.textBaseline = "top";
@@ -306,13 +306,13 @@ var update_turn_counter = function(turn) {
 
 var update_player_status_window = function(id, name, bulk, reserves, turn) {
 	var player_board = document.getElementById("player-display");
-	status_context = player_board.getContext("2d");	
+	status_context = player_board.getContext("2d");
 	var box_height = 22;
 	var box_width = 22;
 	var player_num = player_to_colors[id];
 	status_context.textBaseline = "bottom";
 
-	status_context.clearRect(0, box_height * (player_num - 1), 130, box_height);
+	status_context.clearRect(0, box_height * (player_num - 1), 250, box_height);
 
 	status_context.beginPath();
 	status_context.rect(1, box_height * (player_num - 1), box_height - 2, box_width - 2);
@@ -327,7 +327,18 @@ var update_player_status_window = function(id, name, bulk, reserves, turn) {
 	status_context.fillStyle = "black";
 	status_context.font = 'Bold 10pt Arial black';
 	status_context.textAlign = 'left';
-	status_context.fillText(name + ' : ' + bulk + ' : ' + reserves, box_width + 11, box_height * (player_num - 1) + 15);
+	status_context.fillText(name + ' : ' + bulk + ' : ' + reserves, box_width + 5, box_height * (player_num - 1) + 15);
+};
+
+var playing = false;
+
+var play_loop = function() {
+	playing = true;
+	next_step();
+};
+
+var stop = function() {
+	playing = false;
 };
 
 var next_step = function() {
@@ -342,16 +353,16 @@ var next_step = function() {
 	}
 };
 
-var last_step = function(){
+var last_step = function() {
 	current_step -= 1;
-	var the_event = game_events[current_step];	
+	var the_event = game_events[current_step];
 	update_turn_counter(current_step);
 
 	if (the_event["type"] === "reinforcement") {
 		reverse_reinforcement(the_event);
 	} else {
 		reverse_attack(the_event);
-	}	
+	}
 }
 /*
 					"type": "battle"
@@ -382,17 +393,21 @@ var process_attack = function(attack) {
 	var attack_dice = attack["attack_dice"];
 	var victory = attack["victory"];
 	draw_region(attacker, true);
-	draw_region(defender, true);
+	setTimeout(function() {
 
-	if (victory) {
-		setTimeout(function() {
-			process_victory(attacker, defender, attack_dice);
-		}, 1000);
-	} else {
-		setTimeout(function() {
-			process_loss(attacker, defender);
-		}, 1000);
-	}
+		draw_region(defender, true);
+
+		if (victory) {
+			setTimeout(function() {
+				process_victory(attacker, defender, attack_dice);
+			}, 375);
+		} else {
+			setTimeout(function() {
+				process_loss(attacker, defender);
+			}, 375);
+		}
+	}, 375);
+
 };
 
 /*
@@ -419,7 +434,7 @@ var process_attack = function(attack) {
 	,"attack_value":20,"defense_value":3,"attack_successful":true}
 */
 
-var reverse_attack = function(attack){
+var reverse_attack = function(attack) {
 	var def_reg = attack["defending_region"];
 	var att_reg = attack["attacking_region"];
 	var defender = attack["defender"]["player_id"];
@@ -428,17 +443,17 @@ var reverse_attack = function(attack){
 	armies[att_reg] = attack["attack_dice"].length;
 	armies[def_reg] = attack["defense_dice"].length;
 
-	if(attack["victory"]){
+	if (attack["victory"]) {
 		var temp = player_regions[attacker];
 		var index = temp.indexOf(def_reg);
-		temp.splice(index,1);
+		temp.splice(index, 1);
 		player_regions[attacker] = temp;
 
 		player_regions[defender].push(def_reg);
 	}
 
-	draw_region(att_reg,false);
-	draw_region(def_reg,false);
+	draw_region(att_reg, false);
+	draw_region(def_reg, false);
 
 };
 
@@ -457,17 +472,33 @@ var process_victory = function(attacker, defender, attack_dice) {
 
 	draw_region(attacker, false);
 	draw_region(defender, false);
+	if (playing) {
+		setTimeout(function() {
+			next_step();
+		}, 200);
+	}
 };
 
 var process_loss = function(attacker, defender) {
 	armies[defender] = 1;
 	draw_region(attacker, false);
 	draw_region(defender, false);
+	if (playing) {
+		setTimeout(function() {
+			next_step();
+		}, 200);
+	}
 };
 
 var process_reinforcement = function(reinfo) {
 	var history = reinfo["history"];
-	place_reinforcement_helper(history);
+	if(history[0]){
+		place_reinforcement_helper(history);
+	}else if (playing) {
+		setTimeout(function() {
+			next_step();
+		}, 200);
+	}
 };
 
 var place_reinforcement_helper = function(history) {
@@ -478,7 +509,11 @@ var place_reinforcement_helper = function(history) {
 	if (history[0]) {
 		setTimeout(function() {
 			place_reinforcement_helper(history);
-		}, 250);
+		}, 150);
+	} else if (playing) {
+		setTimeout(function() {
+			next_step();
+		}, 200);
 	}
 }
 
@@ -525,8 +560,8 @@ var process_game_history = function(data) {
 					"attack_dice": game_event["attack_dice"],
 					"defense_dice": game_event["defense_dice"],
 					"victory": game_event["attack_successful"],
-					"attacker" :game_event["attacker"],
-					"defender" :game_event["defender"]
+					"attacker": game_event["attacker"],
+					"defender": game_event["defender"]
 				};
 			}
 
