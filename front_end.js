@@ -1,4 +1,3 @@
-
 var hex_re = /\[(\d+), (\d+)\]/;
 
 var region_hash = {};
@@ -35,6 +34,40 @@ var player_regions = {
 	8: [58, 59, 60]
 };
 
+var armies = {
+	31: 1,
+	32: 2,
+	33: 2,
+	34: 2,
+	35: 2,
+	36: 2,
+	37: 2,
+	38: 2,
+	39: 2,
+	40: 2,
+	41: 2,
+	42: 2,
+	43: 2,
+	44: 2,
+	45: 2,
+	46: 2,
+	47: 2,
+	48: 2,
+	49: 12,
+	50: 1,
+	51: 2,
+	52: 3,
+	53: 4,
+	54: 5,
+	55: 6,
+	56: 7,
+	57: 8,
+	58: 9,
+	59: 10,
+	60: 11,
+
+};
+
 var game_board = document.getElementById("game-display");
 var board_context = game_board.getContext("2d");
 
@@ -49,13 +82,16 @@ var cos_30 = Math.cos(30 / 360 * Math.PI * 2);
 var draw_region = function(region, reg_hexes, selected) {
 
 	var edges = [];
+	var middle_hex = reg_hexes[0];
 
 	for (item in reg_hexes) {
+		var oldsize = edges.length;
 		get_edges(reg_hexes[item][0], reg_hexes[item][1], region, edges);
+		if (oldsize == edges.length) //try and find a hex with no sides drawn
+			middle_hex = reg_hexes[item];
 	}
 
 	build_path(edges);
-	//board_context.stroke();
 
 	var owner = find_region_owner(region);
 
@@ -71,6 +107,20 @@ var draw_region = function(region, reg_hexes, selected) {
 	board_context.closePath();
 	board_context.fill();
 	board_context.stroke();
+
+	draw_army_label(region, middle_hex);
+
+};
+
+var draw_army_label = function(region, hex) {
+	var point = get_center_of_hex(hex[0], hex[1]);
+	var offset = .6*unit;
+	board_context.fillStyle = 'white';
+	board_context.fillRect(point[0]-offset, point[1]-offset, 14, 12);
+	board_context.font = 'Bold 9pt Arial black';
+	board_context.fillStyle = 'black';
+	board_context.textAlign = 'center';
+	board_context.fillText(armies[region], point[0], point[1]+4);
 
 };
 
@@ -128,10 +178,17 @@ var same_edge = function(edge_a, edge_b) {
 	return same_point(edge_a[0], edge_b[0]) && same_point(edge_a[1], edge_b[1]);
 };
 
-var get_edges = function(q, r, reg, edge_col) {
-
+var get_center_of_hex = function(q, r) {
 	var by = unit + unit * r * (1.5) + buffer / 2;
 	var bx = r * unit * cos_30 + (q - (height / 2 - 1)) * unit * cos_30 * 2 + buffer / 2;
+	return [bx, by];
+};
+
+var get_edges = function(q, r, reg, edge_col) {
+	var center_point = get_center_of_hex(q, r);
+
+	var bx = center_point[0];
+	var by = center_point[1];
 	var points = {
 		ne: [Math.round(bx + cos_30 * unit), Math.round(by - .5 * unit)],
 		n: [Math.round(bx), Math.round(by - unit)],
@@ -171,60 +228,6 @@ var get_edges = function(q, r, reg, edge_col) {
 
 	if (!se_neighbor_match(q, r, reg)) {
 		edge_col.push(edges.se);
-	}
-
-};
-
-var draw_hex = function(q, r, reg) {
-
-	bc = board_context;
-	by = unit + unit * r * (1.5);
-	bx = r * unit * cos_30 + (q - (height / 2 - 1)) * unit * cos_30 * 2;
-	points = {
-		ne: [Math.round(bx + cos_30 * unit), Math.round(by - .5 * unit)],
-		n: [Math.round(bx), Math.round(by - unit)],
-		nw: [Math.round(bx - cos_30 * unit), Math.round(by - .5 * unit)],
-		sw: [Math.round(bx - cos_30 * unit), Math.round(by + .5 * unit)],
-		s: [Math.round(bx), Math.round(by + unit)],
-		se: [Math.round(bx + cos_30 * unit), Math.round(by + .5 * unit)]
-	};
-	edges = {
-		e: [points.ne, points.se],
-		ne: [points.ne, points.n],
-		nw: [points.n, points.nw],
-		w: [points.nw, points.sw],
-		sw: [points.sw, points.s],
-		se: [points.s, points.se]
-	};
-
-	if (!e_neighbor_match(q, r, reg)) {
-		bc.moveTo(edges.e[0][0], edges.e[0][1]);
-		bc.lineTo(edges.e[1][0], edges.e[1][1]);
-	}
-
-	if (!ne_neighbor_match(q, r, reg)) {
-		bc.moveTo(edges.ne[0][0], edges.ne[0][1]);
-		bc.lineTo(edges.ne[1][0], edges.ne[1][1]);
-	}
-
-	if (!nw_neighbor_match(q, r, reg)) {
-		bc.moveTo(edges.nw[0][0], edges.nw[0][1]);
-		bc.lineTo(edges.nw[1][0], edges.nw[1][1]);
-	}
-
-	if (!w_neighbor_match(q, r, reg)) {
-		bc.moveTo(edges.w[0][0], edges.w[0][1]);
-		bc.lineTo(edges.w[1][0], edges.w[1][1]);
-	}
-
-	if (!sw_neighbor_match(q, r, reg)) {
-		bc.moveTo(edges.sw[0][0], edges.sw[0][1]);
-		bc.lineTo(edges.sw[1][0], edges.sw[1][1]);
-	}
-
-	if (!se_neighbor_match(q, r, reg)) {
-		bc.moveTo(edges.se[0][0], edges.se[0][1]);
-		bc.lineTo(edges.se[1][0], edges.se[1][1]);
 	}
 
 };
@@ -269,8 +272,3 @@ for (var value in hexes) {
 for (var region in region_hash) {
 	draw_region(region, region_hash[region], false);
 }
-
-//draw_region(1, region_hash[1]);
-
-//board_context.stroke();
-//draw_hex(10,0);
