@@ -135,17 +135,17 @@ var get_center_of_hex = function(q, r) {
 	return [bx, by];
 };
 
-var announce_region = function(x,y){
+var announce_region = function(x, y) {
 	var closest_reg;
 	var distance = 9999999;
 	for (var value in hexes) {
 		var vals = value.match(hex_re);
-		var reg = hexes[value];		
-		var point = get_center_of_hex(parseInt(vals[1]),parseInt(vals[2]));
-		if((point[0]-x)*(point[0]-x)+(point[1]-y)*(point[1]-y) < distance){
-			distance = (point[0]-x)*(point[0]-x)+(point[1]-y)*(point[1]-y);
+		var reg = hexes[value];
+		var point = get_center_of_hex(parseInt(vals[1]), parseInt(vals[2]));
+		if ((point[0] - x) * (point[0] - x) + (point[1] - y) * (point[1] - y) < distance) {
+			distance = (point[0] - x) * (point[0] - x) + (point[1] - y) * (point[1] - y);
 			closest_reg = reg;
-		}		
+		}
 	}
 	alert(closest_reg);
 }
@@ -286,12 +286,33 @@ var process_player_stats = function(data) {
 	}
 };
 
+var status_context;
+
+var update_turn_counter = function(turn) {
+	var player_board = document.getElementById("player-display");
+	if (!status_context)
+		status_context = player_board.getContext("2d");
+	var yOffset = 340;
+
+
+	status_context.clearRect(0, yOffset, 130, 30);	
+
+	status_context.fillStyle = "black";
+	status_context.textBaseline = "top";
+	status_context.font = '13pt Arial black';
+	status_context.textAlign = 'top';
+	status_context.fillText('Turn: ' + turn, 0, yOffset);
+};
+
 var update_player_status_window = function(id, name, bulk, reserves, turn) {
 	var player_board = document.getElementById("player-display");
-	status_context = player_board.getContext("2d");
+	status_context = player_board.getContext("2d");	
 	var box_height = 22;
 	var box_width = 22;
 	var player_num = player_to_colors[id];
+	status_context.textBaseline = "bottom";
+
+	status_context.clearRect(0, box_height * (player_num - 1), 130, box_height);
 
 	status_context.beginPath();
 	status_context.rect(1, box_height * (player_num - 1), box_height - 2, box_width - 2);
@@ -301,6 +322,7 @@ var update_player_status_window = function(id, name, bulk, reserves, turn) {
 		status_context.fillStyle = "black";
 		status_context.lineWidth = 2;
 		status_context.stroke();
+		status_context.closePath();
 	}
 	status_context.fillStyle = "black";
 	status_context.font = 'Bold 10pt Arial black';
@@ -311,6 +333,8 @@ var update_player_status_window = function(id, name, bulk, reserves, turn) {
 var next_step = function() {
 	var the_event = game_events[current_step];
 	current_step += 1;
+	update_turn_counter(current_step);
+
 	if (the_event["type"] === "reinforcement") {
 		process_reinforcement(the_event);
 	} else {
@@ -331,41 +355,41 @@ var process_attack = function(attack) {
 	var defender = attack["defender"]["id"];
 	var attack_dice = attack["attack_dice"];
 	var victory = attack["victory"];
-	draw_region(attacker,true);
-	draw_region(defender,true);
+	draw_region(attacker, true);
+	draw_region(defender, true);
 
-	if(victory){
+	if (victory) {
 		setTimeout(function() {
-			process_victory(attacker,defender,attack_dice);
+			process_victory(attacker, defender, attack_dice);
 		}, 1000);
-	}else{
+	} else {
 		setTimeout(function() {
-			process_loss(attacker,defender);
+			process_loss(attacker, defender);
 		}, 1000);
 	}
 };
 
-var process_victory = function(attacker, defender, attack_dice){
+var process_victory = function(attacker, defender, attack_dice) {
 	armies[attacker] = 1;
 	armies[defender] = attack_dice.length - 1;
 	var loser = find_region_owner(defender);
 	var winner = find_region_owner(attacker);
-	
+
 	var temp = player_regions[loser];
 	var index = temp.indexOf(defender);
-	temp.splice(index,1);
-	
+	temp.splice(index, 1);
+
 	player_regions[loser] = temp;
 	player_regions[winner].push(defender);
 
-	draw_region(attacker,false);
-	draw_region(defender,false);
+	draw_region(attacker, false);
+	draw_region(defender, false);
 };
 
-var process_loss = function(attacker, defender){
+var process_loss = function(attacker, defender) {
 	armies[defender] = 1;
-	draw_region(attacker,false);
-	draw_region(defender,false);
+	draw_region(attacker, false);
+	draw_region(defender, false);
 };
 
 var process_reinforcement = function(reinfo) {
@@ -406,6 +430,7 @@ var current_step;
 var process_game_history = function(data) {
 	game_events = {};
 	current_step = 1;
+	update_turn_counter(current_step);
 	var player_count = Object.keys(player_to_colors).length;
 	for (var key in data) {
 		var game_event = data[key];
@@ -477,16 +502,16 @@ var load_remote_game = function() {
 	board_context = game_board.getContext("2d");
 	clear_board(game_board, board_context);
 
-	
-    elemLeft = game_board.offsetLeft,
-    elemTop = game_board.offsetTop,
+
+	elemLeft = game_board.offsetLeft,
+	elemTop = game_board.offsetTop,
 
 	// Add event listener for `click` events.
 	game_board.addEventListener('click', function(event) {
-    var x = event.pageX - elemLeft,
-        y = event.pageY - elemTop;
-        announce_region(x,y);
-    });
+		var x = event.pageX - elemLeft,
+			y = event.pageY - elemTop;
+		announce_region(x, y);
+	});
 
 
 	start_remote_load(2);
