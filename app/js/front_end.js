@@ -1,3 +1,5 @@
+var api_url = 'localhost:3000';
+
 var hex_re = /\[(\d+), (\d+)\]/;
 
 var region_hash = {};
@@ -741,7 +743,7 @@ var start_remote_load = function(id) {
 
 	game_id = id;
 
-	var url = "http://192.168.0.123:3000/geography";
+	var url = "http://"+api_url+"/geography";
 
 	$.ajax({
 		type: 'GET',
@@ -769,7 +771,7 @@ var start_remote_load = function(id) {
 };
 
 var load_player_stats = function(id) {
-	var url = "http://192.168.0.123:3000/players";
+	var url = "http://"+api_url+"/players";
 
 	$.ajax({
 		type: 'GET',
@@ -796,7 +798,7 @@ var load_player_stats = function(id) {
 };
 
 var load_event_history = function(id) {
-	var url = "http://192.168.0.123:3000/events";
+	var url = "http://"+api_url+"/events";
 
 	$.ajax({
 		type: 'GET',
@@ -825,7 +827,7 @@ var load_event_history = function(id) {
 
 var load_player_data = function(id) {
 
-	var url = "http://192.168.0.123:3000/start_state";
+	var url = "http://"+api_url+"/start_state";
 
 	$.ajax({
 		type: 'GET',
@@ -856,7 +858,7 @@ var load_player_data = function(id) {
 
 var get_new_events = function() {
 
-	var url = "http://192.168.0.123:3000/events";
+	var url = "http://"+api_url+"/events";
 
 	$.ajax({
 		type: 'GET',
@@ -886,7 +888,7 @@ var get_new_events = function() {
 
 var check_for_finished = function() {
 
-	var url = "http://192.168.0.123:3000/game";
+	var url = "http://"+api_url+"/game";
 
 	$.ajax({
 		type: 'GET',

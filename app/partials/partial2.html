@@ -1,5 +1,14 @@
-<p>This is the partial for view 2.</p>
-<p>
-  Showing of 'interpolate' filter:
-  {{ 'Current version is v%VERSION%.' | interpolate }}
-</p>
+<div>
+  <ul class="menu">Active Games:
+    <li ng-repeat="game in activeGames">
+    	<a href="#/view1/{{game.game_id}}">{{game.name}}</a>
+    </li>    
+  </ul>
+
+  <ul class="menu">Complete Games:
+    <li ng-repeat="game in completeGames">
+    	<a href="#/view1/{{game.game_id}}">{{game.name}}</a>
+    </li>    
+  </ul>
+
+</div>
